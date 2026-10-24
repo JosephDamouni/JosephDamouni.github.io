@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Desk Gadget</title>
+<style>
+  :root{--bg:#1F1E1D;--panel:#262624;--ink:#ECEBE6;--muted:#A3A19A;--accent:#D9805F;color-scheme:dark}
+  @media (prefers-color-scheme: light){:root{--bg:#F5F4EF;--panel:#FFFFFF;--ink:#1F1E1C;--muted:#6B6964;--accent:#B85A3C;color-scheme:light}}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 "Segoe UI",system-ui,-apple-system,Arial,sans-serif}
+  main{max-width:640px;margin:0 auto;padding:48px 20px}
+  h1{font-size:30px;margin:0 0 4px}
+  .tag{color:var(--muted);margin:0 0 28px}
+  .card{background:var(--panel);border-radius:12px;padding:18px 22px;margin:0 0 18px}
+  a{color:var(--accent)}
+  ul{padding-left:20px}
+  footer{color:var(--muted);font-size:14px;margin-top:32px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Desk Gadget</h1>
+  <p class="tag">A small personal dashboard for one user's own Google account.</p>
+
+  <div class="card">
+    <p>Desk Gadget is a private tool written for and used by a single person, Joseph (Rani) Damouni. It is not offered to the public and has no other users.</p>
+    <p>It runs on the owner's own Windows laptop and iPhone and shows, in one small panel:</p>
+    <ul>
+      <li>Google Tasks: open tasks, with the option to add a task or mark one done</li>
+      <li>Google Calendar: upcoming events (read-only)</li>
+      <li>Gmail: important messages, and course emails about homework (read-only)</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <p>How data is handled is described in the <a href="privacy.html">privacy policy</a>.</p>
+  </div>
+
+  <footer>Contact: joseph.damouny@gmail.com</footer>
+</main>
+</body>
+</html>
