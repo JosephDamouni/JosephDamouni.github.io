@@ -81,10 +81,13 @@ section{background:var(--panel);border:1px solid var(--line);border-radius:14px;
 .add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:0 14px 12px}
 .add input[type=text]{grid-column:1/-1;width:100%;border:1px solid var(--line);background:var(--soft);border-radius:10px;padding:11px 12px;font-size:16px}
 .datewrap{position:relative;display:block;min-width:0}
-.add input[type=date]{width:100%;min-height:46px;border:1px solid var(--line);background:var(--soft);border-radius:10px;padding:9px 12px;min-width:0;font-size:15px;color:var(--ink)}
+.add input[type=date]{-webkit-appearance:none;appearance:none;display:block;max-width:100%;width:100%;min-height:46px;direction:ltr;border:1px solid var(--line);background:var(--soft);border-radius:10px;padding:9px 12px;min-width:0;font-size:15px;color:var(--ink)}
 .datewrap .ph{position:absolute;inset-inline-start:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;font-size:15px}
 .datewrap.has .ph{display:none}
 .datewrap:not(.has) input[type=date]{color:transparent}
+.add input[type=date]::-webkit-date-and-time-value{text-align:start}
+[dir="rtl"] .add input[type=date]::-webkit-date-and-time-value{text-align:right}
+.datewrap{overflow:hidden;border-radius:10px}
 .add button{border:0;background:var(--accent);color:var(--accent-ink);border-radius:10px;padding:0 20px;font-weight:700}
 .add button:disabled{opacity:.5}
 .add .err{grid-column:1/-1;color:var(--bad);font-size:13px}
@@ -92,7 +95,7 @@ section{background:var(--panel);border:1px solid var(--line);border-radius:14px;
 .nx{padding:2px 14px 12px;display:grid;gap:3px}
 .nx .name{font-weight:700;font-size:16px}
 .nx .meta{color:var(--muted);font-size:13.5px}
-.nx .count{font-family:var(--f-num);font-size:13px;color:var(--accent)}
+.nx .count{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--accent)}
 .alertline{display:flex;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid var(--line);font-size:13.5px}
 .alertline .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .weeknav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px}
@@ -162,7 +165,7 @@ section{background:var(--panel);border:1px solid var(--line);border-radius:14px;
       <div class="sh"><h2 id="hTasks" data-i18n="tasks">Tasks</h2><span class="meta" id="taskMeta"></span></div>
       <form class="add" id="addForm" autocomplete="off">
         <input type="text" id="taskTitle" placeholder="Add a task" data-i18n-ph="addPh" maxlength="300" aria-label="New task" enterkeyhint="done">
-        <label class="datewrap" id="dateWrap"><span class="ph" data-i18n="dueDate">Due date (optional)</span><input type="date" id="taskDue" aria-label="Due date (optional)"></label>
+        <label class="datewrap" id="dateWrap"><span class="ph" data-i18n="dueDate">Due date (optional)</span><input type="date" id="taskDue" dir="ltr" aria-label="Due date (optional)"></label>
         <button type="submit" id="addBtn" data-i18n="add">Add</button>
         <div class="err" id="addErr" hidden></div>
       </form>
