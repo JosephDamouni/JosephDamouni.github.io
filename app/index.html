@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Desk">
+<meta name="theme-color" content="#1F1E1D">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Desk Gadget</title>
+<style>
+/* Layout: phone-first single column. Sticky clock bar + tabs at the top, sections below, safe-area aware. */
+:root{
+  --bg:#F5F4EF; --panel:#FFFFFF; --ink:#1F1E1C; --muted:#6B6964; --line:#E3E1DA; --soft:#F0EEE8;
+  --accent:#B85A3C; --accent-ink:#FFFFFF;
+  --bad:#B03A32; --bad-bg:#F9E3E1; --warn:#99640F; --warn-bg:#FBEFD8; --info:#2B5C9E; --info-bg:#E3EBF7; --mute-bg:#ECEAE4;
+  --f-ui:-apple-system,"SF Pro Text",system-ui,"Segoe UI",Arial,sans-serif;
+  --f-num:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#1F1E1D; --panel:#262624; --ink:#ECEBE6; --muted:#A3A19A; --line:#383733; --soft:#2E2D2B;
+  --accent:#D9805F; --accent-ink:#1F1E1D;
+  --bad:#F0948B; --bad-bg:#3B2422; --warn:#E5B567; --warn-bg:#382E1E; --info:#93B4E6; --info-bg:#232C3A; --mute-bg:#33322F;
+  color-scheme:dark;
+}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+[hidden]{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 var(--f-ui)}
+body{min-height:100vh;overscroll-behavior-y:contain}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+
+.top{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 8px;display:grid;gap:10px}
+.clock{display:flex;align-items:baseline;gap:10px}
+.clock .time{font-weight:700;font-size:30px;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1}
+.clock .date{color:var(--muted);font-size:14px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ic{width:38px;height:38px;border:1px solid var(--line);background:var(--panel);border-radius:10px;display:grid;place-items:center;color:var(--muted)}
+.ic svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.ic.spin svg{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.ic.spin svg{animation:none}}
+.tabs{display:flex;gap:4px;padding:3px;background:var(--panel);border:1px solid var(--line);border-radius:11px}
+.tab{flex:1;border:0;background:transparent;border-radius:8px;padding:8px;font-weight:600;font-size:14px;color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--soft);color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+
+.pull{height:0;overflow:hidden;text-align:center;color:var(--muted);font-size:12px;transition:height .15s}
+main{padding:4px 16px calc(env(safe-area-inset-bottom,0px) + 24px);display:grid;gap:12px}
+section{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.sh{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding:12px 14px 8px}
+.sh h2{margin:0;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em}
+.sh .meta{font-size:12px;color:var(--muted)}
+.empty{padding:4px 14px 14px;color:var(--muted);font-size:14px}
+.group{padding:10px 14px 4px;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.group.bad{color:var(--bad)} .group.warn{color:var(--warn)} .group.today{color:var(--accent)}
+
+.item{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:2px 12px;padding:11px 14px;border-top:1px solid var(--line);align-items:start;min-height:52px}
+.item.noicon{grid-template-columns:minmax(0,1fr) auto}
+.item .main{min-width:0}
+.item .t{font-weight:600;overflow-wrap:anywhere}
+.item .s{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .when{font-family:var(--f-num);font-size:12px;color:var(--muted);white-space:nowrap;padding-top:2px;font-variant-numeric:tabular-nums}
+.item.link:active{background:var(--soft)}
+.item.past{opacity:.5}
+.item.cancelled .t{text-decoration:line-through;color:var(--muted)}
+.right{display:grid;justify-items:end;gap:5px}
+.check{appearance:none;-webkit-appearance:none;width:22px;height:22px;border:2px solid var(--muted);border-radius:50%;margin:1px 0 0}
+.check:checked{background:var(--accent);border-color:var(--accent)}
+.item.done .t{text-decoration:line-through;color:var(--muted)}
+.chip{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;background:var(--mute-bg);color:var(--muted)}
+.chip.bad{background:var(--bad-bg);color:var(--bad)} .chip.warn{background:var(--warn-bg);color:var(--warn)} .chip.info{background:var(--info-bg);color:var(--info)}
+.daybar{width:4px;border-radius:2px;align-self:stretch;background:var(--accent)}
+.daybar.t-ex{background:var(--info)} .daybar.t-sem{background:var(--warn)} .daybar.cancel{background:var(--muted)} .daybar.allday{background:var(--info)}
+.done-btn{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;font-size:12px;font-weight:600;padding:4px 12px}
+
+.add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:0 14px 12px}
+.add input[type=text]{grid-column:1/-1;width:100%;border:1px solid var(--line);background:var(--soft);border-radius:10px;padding:11px 12px;font-size:16px}
+.add input[type=date]{border:1px solid var(--line);background:var(--soft);border-radius:10px;padding:9px 10px;min-width:0;font-size:15px}
+.add button{border:0;background:var(--accent);color:var(--accent-ink);border-radius:10px;padding:0 20px;font-weight:700}
+.add button:disabled{opacity:.5}
+.add .err{grid-column:1/-1;color:var(--bad);font-size:13px}
+
+.nx{padding:2px 14px 12px;display:grid;gap:3px}
+.nx .name{font-weight:700;font-size:16px}
+.nx .meta{color:var(--muted);font-size:13.5px}
+.nx .count{font-family:var(--f-num);font-size:13px;color:var(--accent)}
+.alertline{display:flex;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid var(--line);font-size:13.5px}
+.alertline .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.weeknav{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px}
+.weeknav .lbl{font-weight:700}
+.weeknav button{border:1px solid var(--line);background:transparent;border-radius:8px;width:36px;height:32px;font-size:18px}
+.weeknav button:disabled{opacity:.35}
+
+.banner{margin:0 16px;padding:10px 12px;border-radius:12px;font-size:13.5px;background:var(--warn-bg);color:var(--warn);display:flex;gap:10px;align-items:center;justify-content:space-between}
+.banner.bad{background:var(--bad-bg);color:var(--bad)}
+.banner button{border:1px solid currentColor;background:transparent;border-radius:999px;padding:4px 12px;white-space:nowrap}
+.foot{color:var(--muted);font-size:12px;text-align:center;padding:4px 0 0}
+.foot button{border:0;background:none;color:var(--muted);text-decoration:underline;text-underline-offset:2px;padding:0;font-size:12px}
+
+/* Setup */
+.setup{padding:calc(env(safe-area-inset-top,0px) + 28px) 20px 28px;display:grid;gap:14px;max-width:560px;margin:0 auto}
+.setup h1{margin:0;font-size:26px}
+.setup p,.setup li{color:var(--muted);line-height:1.5}
+.setup ol{padding-left:20px;margin:0;display:grid;gap:6px}
+.setup code{font-family:var(--f-num);background:var(--soft);padding:1px 5px;border-radius:5px;color:var(--ink)}
+.setup textarea{width:100%;min-height:150px;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:12px;font:13px/1.4 var(--f-num)}
+.setup .go{border:0;background:var(--accent);color:var(--accent-ink);border-radius:12px;padding:14px;font-weight:700;font-size:16px}
+.setup .err{color:var(--bad)}
+</style>
+</head>
+<body>
+
+<div id="setup" class="setup" hidden>
+  <h1>Desk Gadget</h1>
+  <p>Connect your Google account once. Paste the sign-in file from your laptop's Desk Gadget:</p>
+  <ol>
+    <li>On the laptop, press Windows + R, type <code>%APPDATA%\DeskGadget</code> and open <code>token.json</code> in Notepad.</li>
+    <li>Copy everything in it and get it to this phone (for example, email it to yourself, then delete that email).</li>
+    <li>Paste it below and tap Connect.</li>
+  </ol>
+  <label for="tokenBox" class="sr">token.json</label>
+  <textarea id="tokenBox" placeholder='{"token": "...", "refresh_token": "...", "client_id": "...", "client_secret": "..."}' autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+  <div class="err" id="setupErr" hidden></div>
+  <button class="go" id="connectBtn" type="button">Connect</button>
+  <p style="font-size:13px">It stays on this phone only. Nothing is sent anywhere except to Google.</p>
+</div>
+
+<div id="appView" hidden>
+  <header class="top">
+    <div class="clock">
+      <span class="time" id="time">--:--</span><span class="date" id="date"></span>
+      <button class="ic" id="bRefresh" type="button" aria-label="Refresh"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button class="tab" role="tab" id="tabToday" aria-selected="true" type="button">Today</button>
+      <button class="tab" role="tab" id="tabWeek" aria-selected="false" type="button">Week</button>
+    </nav>
+  </header>
+  <div class="pull" id="pull">Release to refresh</div>
+  <div class="banner" id="banner" hidden><span id="bannerText"></span><button id="bannerBtn" type="button" hidden></button></div>
+
+  <main id="viewToday">
+    <section id="nextSec" hidden aria-labelledby="hNext">
+      <div class="sh"><h2 id="hNext">Next class</h2><span class="meta" id="nextMeta"></span></div>
+      <div id="next"></div>
+    </section>
+    <section aria-labelledby="hTasks">
+      <div class="sh"><h2 id="hTasks">Tasks</h2><span class="meta" id="taskMeta"></span></div>
+      <form class="add" id="addForm" autocomplete="off">
+        <input type="text" id="taskTitle" placeholder="Add a task" maxlength="300" aria-label="New task" enterkeyhint="done">
+        <input type="date" id="taskDue" aria-label="Due date (optional)">
+        <button type="submit" id="addBtn">Add</button>
+        <div class="err" id="addErr" hidden></div>
+      </form>
+      <div id="tasks"><div class="empty">Loading…</div></div>
+    </section>
+    <section aria-labelledby="hCal">
+      <div class="sh"><h2 id="hCal">Calendar</h2><span class="meta">next 30 days</span></div>
+      <div id="cal"><div class="empty">Loading…</div></div>
+    </section>
+    <section aria-labelledby="hMail">
+      <div class="sh"><h2 id="hMail">Important mail</h2><span class="meta" id="mailMeta"></span></div>
+      <div id="mail"><div class="empty">Loading…</div></div>
+    </section>
+    <div class="foot"><span id="updated"></span> · <button type="button" id="bSignOut">Disconnect</button></div>
+  </main>
+
+  <main id="viewWeek" hidden>
+    <section aria-labelledby="hWeek">
+      <div class="weeknav">
+        <button type="button" id="wkPrev" aria-label="This week">‹</button>
+        <span class="lbl" id="hWeek">This week</span>
+        <button type="button" id="wkNext" aria-label="Next week">›</button>
+      </div>
+      <div id="week"></div>
+      <div class="foot" id="weekMeta" style="padding:6px 14px 12px"></div>
+    </section>
+  </main>
+</div>
+
+<script src="core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
