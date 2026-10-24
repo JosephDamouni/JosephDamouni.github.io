@@ -80,7 +80,11 @@ section{background:var(--panel);border:1px solid var(--line);border-radius:14px;
 
 .add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:0 14px 12px}
 .add input[type=text]{grid-column:1/-1;width:100%;border:1px solid var(--line);background:var(--soft);border-radius:10px;padding:11px 12px;font-size:16px}
-.add input[type=date]{border:1px solid var(--line);background:var(--soft);border-radius:10px;padding:9px 10px;min-width:0;font-size:15px}
+.datewrap{position:relative;display:block;min-width:0}
+.add input[type=date]{width:100%;min-height:46px;border:1px solid var(--line);background:var(--soft);border-radius:10px;padding:9px 12px;min-width:0;font-size:15px;color:var(--ink)}
+.datewrap .ph{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;font-size:15px}
+.datewrap.has .ph{display:none}
+.datewrap:not(.has) input[type=date]{color:transparent}
 .add button{border:0;background:var(--accent);color:var(--accent-ink);border-radius:10px;padding:0 20px;font-weight:700}
 .add button:disabled{opacity:.5}
 .add .err{grid-column:1/-1;color:var(--bad);font-size:13px}
@@ -153,7 +157,7 @@ section{background:var(--panel);border:1px solid var(--line);border-radius:14px;
       <div class="sh"><h2 id="hTasks">Tasks</h2><span class="meta" id="taskMeta"></span></div>
       <form class="add" id="addForm" autocomplete="off">
         <input type="text" id="taskTitle" placeholder="Add a task" maxlength="300" aria-label="New task" enterkeyhint="done">
-        <input type="date" id="taskDue" aria-label="Due date (optional)">
+        <label class="datewrap" id="dateWrap"><span class="ph">Due date (optional)</span><input type="date" id="taskDue" aria-label="Due date (optional)"></label>
         <button type="submit" id="addBtn">Add</button>
         <div class="err" id="addErr" hidden></div>
       </form>

@@ -86,10 +86,15 @@
 
   // ------------------------------------------------------------ render helpers
   const dayLabel = C.dayLabel, today = C.todayStr, addDays = C.addDays;
+  let bannerTimer = null;
   function banner(text, bad, btn, onBtn) {
+    clearTimeout(bannerTimer);
     $("bannerText").textContent = text; $("banner").className = "banner" + (bad ? " bad" : ""); $("banner").hidden = !text;
     $("bannerBtn").hidden = !btn; if (btn) { $("bannerBtn").textContent = btn; $("bannerBtn").onclick = onBtn; }
+    if (text && !bad) bannerTimer = setTimeout(() => { $("banner").hidden = true; }, 8000); // info messages fade away
   }
+  const syncDate = () => $("dateWrap").classList.toggle("has", !!$("taskDue").value);
+  $("taskDue").addEventListener("input", syncDate); $("taskDue").addEventListener("change", syncDate);
   const open = url => { if (url) window.open(url, "_blank", "noopener"); };
   function tick() {
     const d = new Date();
@@ -222,7 +227,7 @@
     $("addBtn").disabled = true; $("addErr").hidden = true;
     try {
       await client().addTask(title, $("taskDue").value || "");
-      $("taskTitle").value = ""; $("taskDue").value = ""; $("taskTitle").blur();
+      $("taskTitle").value = ""; $("taskDue").value = ""; syncDate(); $("taskTitle").blur();
       lastLoad = 0; await load(true);
     } catch (err) { $("addErr").textContent = "Couldn't add the task: " + err.message; $("addErr").hidden = false; }
     finally { $("addBtn").disabled = false; }
@@ -314,6 +319,7 @@
     renderAll(); load(true);
   }
   setInterval(() => { if (!$("appView").hidden) { renderAll(); if (Date.now() - lastLoad > 5 * 60000) load(true); } }, 60000);
+  setInterval(tick, 5000);
   window.__deskTest = s => { state = s; $("setup").hidden = true; $("appView").hidden = false; renderAll(); };
 
   if (store.get("creds")) start(); else showSetup("");
