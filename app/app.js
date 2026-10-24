@@ -45,6 +45,11 @@
       expiredPaste: "Google says this sign-in has expired. Sign in again on the laptop gadget, then copy the new token.json.",
       expired: "Your Google sign-in has expired. Paste a fresh token.json from the laptop.",
       noReach: "Couldn't reach Google: {m}", langBtn: "עב", langLabel: "עברית",
+      notif: "Notifications", nOn: "On", nOff: "Off", nMuted: "Silenced until {t}",
+      silToday: "Silence today", silWeek: "Silence for a week", turnOff: "Turn off", turnOn: "Turn back on",
+      kMorning: "Morning summary · 08:00", kEvening: "For tomorrow · 20:00", kClasses: "15 min before class",
+      nNote: "Silence buttons open Scriptable for a moment to apply right away. Other changes apply at the next scheduled update.",
+      applyNow: "Apply now", saved: "Saved.", saveFail: "Couldn't save: {m}",
     },
     he: {
       today: "היום", week: "שבוע", tomorrow: "מחר", yesterday: "אתמול",
@@ -75,6 +80,11 @@
       expiredPaste: "Google מודיעה שההתחברות הזו פגה. התחברו מחדש בגאדג׳ט במחשב והעתיקו את token.json החדש.",
       expired: "ההתחברות ל־Google פגה. הדביקו token.json חדש מהמחשב.",
       noReach: "אין גישה ל־Google: {m}", langBtn: "EN", langLabel: "English",
+      notif: "התראות", nOn: "פועלות", nOff: "כבויות", nMuted: "מושתקות עד {t}",
+      silToday: "השתקה להיום", silWeek: "השתקה לשבוע", turnOff: "כיבוי", turnOn: "הפעלה מחדש",
+      kMorning: "סיכום בוקר · 08:00", kEvening: "תזכורת למחר · 20:00", kClasses: "15 דק׳ לפני שיעור",
+      nNote: "כפתורי ההשתקה פותחים את Scriptable לרגע כדי להחיל מיד. שינויים אחרים יחולו בעדכון המתוזמן הבא.",
+      applyNow: "החלה עכשיו", saved: "נשמר.", saveFail: "השמירה נכשלה: {m}",
     },
   };
   let lang = store.get("lang", (navigator.language || "").toLowerCase().startsWith("he") ? "he" : "en");
@@ -93,7 +103,10 @@
     document.querySelectorAll("[data-i18n-ph]").forEach(n => { n.placeholder = t(n.dataset.i18nPh); });
     document.querySelectorAll(".langbtn").forEach(b => { b.textContent = t("langBtn"); b.setAttribute("aria-label", t("langLabel")); });
   }
-  function toggleLang() { lang = lang === "he" ? "en" : "he"; store.set("lang", lang); applyLanguage(); if (!$("appView").hidden) renderAll(); }
+  function toggleLang() {
+    lang = lang === "he" ? "en" : "he"; store.set("lang", lang); applyLanguage();
+    if (!$("appView").hidden) { renderAll(); saveSettings({ lang }, true); } // notifications follow the app language
+  }
   document.querySelectorAll(".langbtn").forEach(b => { b.onclick = toggleLang; });
 
   // date words in the chosen language
@@ -134,7 +147,7 @@
 
   // ------------------------------------------------------------ state
   let state = store.get("cache", { tasks: [], events: [], mail: [], data: { timetable: null, alerts: [] } });
-  let busy = false, lastLoad = 0;
+  let busy = false, lastLoad = 0, rawData = null;
   const hidden = new Set();
 
   // ------------------------------------------------------------ setup screen
@@ -167,13 +180,14 @@
     if (tk.status === "fulfilled") state.tasks = tk.value;
     if (ev.status === "fulfilled") state.events = ev.value;
     if (ml.status === "fulfilled") state.mail = ml.value;
-    if (dt.status === "fulfilled") state.data = { timetable: dt.value.timetable, alerts: dt.value.alerts };
+    if (dt.status === "fulfilled") { rawData = dt.value; state.data = { timetable: dt.value.timetable, alerts: dt.value.alerts, settings: dt.value.settings }; }
     const failed = results.filter(r => r.status === "rejected");
     state.error = failed.length ? (failed.length === results.length ? { key: "offline" } : { key: "partial", m: failed[0].reason.message }) : null;
     state.updatedAt = failed.length === results.length ? state.updatedAt : Date.now();
     hidden.clear(); store.set("cache", state); lastLoad = Date.now();
     busy = false; $("bRefresh").classList.remove("spin");
     renderAll();
+    if (dt.status === "fulfilled" && settings().lang !== lang) saveSettings({ lang }, true); // reminders in the app's language
     if (dt.status === "fulfilled") moodle(dt.value);
   }
 
@@ -376,10 +390,47 @@
     $("mail").replaceChildren(frag);
   }
 
+  // ------------------------------------------------------------ notifications
+  const settings = () => C.notifySettings(state.data && state.data.settings);
+  const SCRIPTABLE = "scriptable:///run/" + encodeURIComponent("Desk Gadget");
+  async function saveSettings(patch, quiet) {
+    const next = Object.assign(settings(), patch);
+    state.data = Object.assign({}, state.data, { settings: next }); store.set("cache", state); renderNotif();
+    try {
+      if (!rawData) rawData = await client().readData();
+      await client().saveSettings(rawData, next);
+      if (!quiet) banner(t("saved"), false);
+    } catch (e) { if (!quiet) banner(t("saveFail", { m: e.message }), true, t("ok"), () => banner("")); }
+  }
+  async function mute(mode) {
+    await saveSettings(C.applyMute(settings(), mode, new Date()), true);
+    location.href = SCRIPTABLE + "?mute=" + mode; // Scriptable clears or reschedules the pending notifications right away
+  }
+  function renderNotif() {
+    const s = settings(), m = C.muteState(s, new Date());
+    $("notifState").textContent = m.kind === "off" ? t("nOff") : m.kind === "muted"
+      ? t("nMuted", { t: m.until.toLocaleString(locale(), { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) })
+      : t("nOn");
+    const btns = [];
+    if (m.kind === "on") btns.push(["silToday", "day"], ["silWeek", "week"], ["turnOff", "off"]);
+    else btns.push(["turnOn", "on"]);
+    $("notifBtns").replaceChildren(...btns.map(([k, mode]) => {
+      const b = el("button", mode === "on" ? "primary" : "", t(k)); b.type = "button"; b.onclick = () => mute(mode); return b;
+    }));
+    [["kMorning", "morning"], ["kEvening", "evening"], ["kClasses", "classes"]].forEach(([id, key]) => {
+      $(id).checked = s[key] !== false;
+      $(id).closest(".sw").classList.toggle("off", m.kind === "off");
+    });
+  }
+  [["kMorning", "morning"], ["kEvening", "evening"], ["kClasses", "classes"]].forEach(([id, key]) => {
+    $(id).addEventListener("change", () => saveSettings({ [key]: $(id).checked }));
+  });
+  $("applyNow").onclick = () => { location.href = SCRIPTABLE + "?apply=1"; };
+
   function renderAll() {
     tick();
     const occ = classes();
-    renderNext(occ); renderTasks(); renderCal(); renderMail(); renderWeek(occ);
+    renderNext(occ); renderTasks(); renderCal(); renderMail(); renderWeek(occ); renderNotif();
     $("updated").textContent = state.updatedAt ? t("updated", { t: ltr(new Date(state.updatedAt).toTimeString().slice(0, 5)) }) : "";
     const err = state.error && typeof state.error === "object" ? t(state.error.key, state.error) : "";
     if (err && $("banner").hidden) banner(err, false, t("retry"), () => { banner(""); load(true); });

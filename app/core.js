@@ -263,10 +263,49 @@
   }
 
   // ---------------------------------------------------------------- reminders (future times, for scheduling)
-  function upcomingReminders(now, tasks, occ, hours = 48) {
+  // Notification settings shared by the app and the notifier (stored in the "Desk Gadget data" list)
+  const DEFAULT_NOTIFY = { notify: true, mutedUntil: "", morning: true, evening: true, classes: true, lang: "en" };
+  const notifySettings = s => Object.assign({}, DEFAULT_NOTIFY, s || {});
+  function muteState(s, now) {
+    s = notifySettings(s);
+    if (!s.notify) return { kind: "off" };
+    if (s.mutedUntil && new Date(s.mutedUntil) > now) return { kind: "muted", until: new Date(s.mutedUntil) };
+    return { kind: "on" };
+  }
+  function applyMute(s, mode, now) {
+    s = notifySettings(s);
+    if (mode === "off") s.notify = false;
+    else if (mode === "on") { s.notify = true; s.mutedUntil = ""; }
+    else if (mode === "day") { const e = new Date(now); e.setHours(23, 59, 0, 0); s.notify = true; s.mutedUntil = e.toISOString(); }
+    else if (mode === "week") { s.notify = true; s.mutedUntil = new Date(now.getTime() + 7 * 86400e3).toISOString(); }
+    return s;
+  }
+
+  const RTXT = {
+    en: {
+      morning: "Good morning", dueToday: "Due today: ", overdue: n => `Overdue: ${n} task${n > 1 ? "s" : ""}`,
+      firstClass: (t, n, r) => `First class ${t}: ${n} · ${r}`, evening: "For tomorrow", dueTomorrow: "Due tomorrow: ",
+      tomorrowClass: (t, n, r) => `Tomorrow ${t}: ${n} · ${r}`, classAt: t => `Class at ${t}`, cancelledT: "Class cancelled",
+      cancelledB: (n, t) => `${n} (${t}) is cancelled today`, movedTo: r => `moved to room ${r}`, more: n => ` +${n} more`,
+      silenceToday: "Silence today", turnOff: "Turn off notifications",
+    },
+    he: {
+      morning: "בוקר טוב", dueToday: "להיום: ", overdue: n => n === 1 ? "משימה אחת באיחור" : `${n} משימות באיחור`,
+      firstClass: (t, n, r) => `שיעור ראשון ב־${t}: ${n} · ${r}`, evening: "למחר", dueTomorrow: "להגשה מחר: ",
+      tomorrowClass: (t, n, r) => `מחר ב־${t}: ${n} · ${r}`, classAt: t => `שיעור ב־${t}`, cancelledT: "השיעור בוטל",
+      cancelledB: (n, t) => `${n} (${t}) בוטל היום`, movedTo: r => `הועבר לחדר ${r}`, more: n => ` ועוד ${n}`,
+      silenceToday: "השתקה להיום", turnOff: "כיבוי התראות",
+    },
+  };
+
+  // Future reminders, filtered by the notification settings. Each has id, kind, when, title, body.
+  function upcomingReminders(now, tasks, occ, hours = 48, settings) {
+    const st = notifySettings(settings), L = RTXT[st.lang] || RTXT.en;
+    const mute = muteState(st, now);
+    if (mute.kind === "off") return [];
     const out = [], end = new Date(now.getTime() + hours * 3600e3), lead = SETTINGS.classReminderMinutes;
-    const roomOf = o => (o.alert && o.alert.kind === "moved" && o.alert.room) ? "moved to room " + o.alert.room : o.room;
-    const short = list => list.slice(0, 3).map(t => t.title).join(", ") + (list.length > 3 ? ` +${list.length - 3} more` : "");
+    const roomOf = o => (o.alert && o.alert.kind === "moved" && o.alert.room) ? L.movedTo(o.alert.room) : o.room;
+    const short = list => list.slice(0, 3).map(t => t.title).join(", ") + (list.length > 3 ? L.more(list.length - 3) : "");
     const firstClass = ds => occ.find(o => o.date === ds && !(o.alert && o.alert.kind === "cancelled"));
     for (let i = 0; i <= Math.ceil(hours / 24); i++) {
       const ds = addDays(ymd(now), i), fc = firstClass(ds);
@@ -275,25 +314,27 @@
       if (fc) { const e = new Date(at(ds, fc.start).getTime() - (lead + 15) * 60000); if (e < mt) mt = e; }
       const due = tasks.filter(t => t.due === ds), late = tasks.filter(t => t.due && t.due < ds);
       const mLines = [];
-      if (due.length) mLines.push("Due today: " + short(due));
-      if (late.length) mLines.push(`Overdue: ${late.length} task${late.length > 1 ? "s" : ""}`);
-      if (fc) mLines.push(`First class ${fc.start}: ${fc.name} · ${roomOf(fc)}`);
-      if (mLines.length) out.push({ id: `dg-morning-${ds}`, when: mt, title: "Good morning", body: mLines.join("\n") });
+      if (due.length) mLines.push(L.dueToday + short(due));
+      if (late.length) mLines.push(L.overdue(late.length));
+      if (fc) mLines.push(L.firstClass(fc.start, fc.name, roomOf(fc)));
+      if (mLines.length) out.push({ id: `dg-morning-${ds}`, kind: "morning", when: mt, title: L.morning, body: mLines.join("\n") });
       // evening before the next day
       const next = addDays(ds, 1), fcn = firstClass(next), dueN = tasks.filter(t => t.due === next), eLines = [];
-      if (dueN.length) eLines.push("Due tomorrow: " + short(dueN));
-      if (fcn) eLines.push(`Tomorrow ${fcn.start}: ${fcn.name} · ${roomOf(fcn)}`);
-      if (eLines.length) out.push({ id: `dg-evening-${ds}`, when: at(ds, SETTINGS.reminderEvening), title: "For tomorrow", body: eLines.join("\n") });
+      if (dueN.length) eLines.push(L.dueTomorrow + short(dueN));
+      if (fcn) eLines.push(L.tomorrowClass(fcn.start, fcn.name, roomOf(fcn)));
+      if (eLines.length) out.push({ id: `dg-evening-${ds}`, kind: "evening", when: at(ds, SETTINGS.reminderEvening), title: L.evening, body: eLines.join("\n") });
       // before each class
       occ.filter(o => o.date === ds).forEach(o => {
         const w = new Date(at(ds, o.start).getTime() - lead * 60000);
         const cancelled = o.alert && o.alert.kind === "cancelled";
-        out.push({ id: `dg-class-${ds}-${o.start}-${o.type}`, when: w, title: cancelled ? "Class cancelled" : `Class at ${o.start}`,
-          body: cancelled ? `${o.name} (${o.start}) is cancelled today` : `${o.name} · ${roomOf(o)}` });
+        out.push({ id: `dg-class-${ds}-${o.start}-${o.type}`, kind: "classes", when: w, title: cancelled ? L.cancelledT : L.classAt(o.start),
+          body: cancelled ? L.cancelledB(o.name, o.start) : `${o.name} · ${roomOf(o)}` });
       });
     }
-    return out.filter(r => r.when > now && r.when <= end).sort((a, b) => a.when - b.when);
+    return out.filter(r => r.when > now && r.when <= end && st[r.kind] !== false &&
+      !(mute.kind === "muted" && r.when < mute.until)).sort((a, b) => a.when - b.when);
   }
+  const reminderText = lang => RTXT[lang] || RTXT.en;
 
   // ---------------------------------------------------------------- Google client
   // http(url, {method, headers, body}) -> Promise<{status, json}> ; decode64(base64url) -> string
@@ -367,16 +408,19 @@
       (await listTasks(l.id, true)).forEach(t => { items[t.title] = t; });
       const parse = s => { try { return JSON.parse(s); } catch (e) { return null; } };
       return { listId: l.id, timetable: items.timetable ? parse(items.timetable.notes) : null,
-        alerts: (items.class_alerts && parse(items.class_alerts.notes)) || [], items };
+        alerts: (items.class_alerts && parse(items.class_alerts.notes)) || [],
+        settings: notifySettings(items.settings && parse(items.settings.notes)), items };
     }
-    async function saveAlerts(data, alerts) {
-      let listId = data.listId;
-      if (!listId) listId = (await g(`${T}/users/@me/lists`, "POST", { title: DATA_LIST })).id;
-      const notes = JSON.stringify(alerts);
-      const t = data.items && data.items.class_alerts;
-      if (t) return g(`${T}/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(t.id)}`, "PATCH", { notes });
-      return g(`${T}/lists/${encodeURIComponent(listId)}/tasks`, "POST", { title: "class_alerts", notes });
+    async function writeNote(data, title, value) {
+      data.items = data.items || {};
+      if (!data.listId) data.listId = (await g(`${T}/users/@me/lists`, "POST", { title: DATA_LIST })).id;
+      const notes = JSON.stringify(value);
+      const t = data.items[title];
+      if (t) { await g(`${T}/lists/${encodeURIComponent(data.listId)}/tasks/${encodeURIComponent(t.id)}`, "PATCH", { notes }); t.notes = notes; return; }
+      data.items[title] = await g(`${T}/lists/${encodeURIComponent(data.listId)}/tasks`, "POST", { title, notes });
     }
+    const saveAlerts = (data, alerts) => writeNote(data, "class_alerts", alerts);
+    const saveSettings = (data, settings) => writeNote(data, "settings", notifySettings(settings));
 
     function messageText(msg) {
       const plain = [], html = [];
@@ -426,13 +470,14 @@
       return { added, alerts };
     }
 
-    return { token, tasks, addTask, completeTask, events, mail, readData, saveAlerts, moodleSync };
+    return { token, tasks, addTask, completeTask, events, mail, readData, saveAlerts, saveSettings, moodleSync };
   }
 
   const api = {
     SETTINGS, DATA_LIST, pad, ymd, todayStr, addDays, dayLabel, hm, ago, clean, mailQuery, classifyThread,
     shapeEvent, shapeTask, normalizeSubject, courseTitle, courseCode, isCourseEmail, isTaskEmail, findDates, findDueDate,
     weekStart, displayWeekStart, occurrences, attachAlerts, detectChange, mergeAlerts, upcomingReminders, GoogleClient,
+    notifySettings, muteState, applyMute, reminderText,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.DeskCore = api;

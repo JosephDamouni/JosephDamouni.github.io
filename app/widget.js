@@ -1,5 +1,6 @@
-// Desk Gadget widget for Scriptable. Loaded and kept up to date by the small "Desk Gadget" script on the phone.
-// Shows tasks / calendar / mail / next class on the home screen and schedules the iPhone reminders.
+// Desk Gadget for Scriptable. Loaded and kept up to date by the small "Desk Gadget" script on the phone.
+// Schedules the iPhone reminders (run by a Shortcuts automation, no widget needed), handles
+// "Silence" from the app and from the notifications, and can also draw a home-screen widget.
 module.exports = async function run(core) {
   const APP_URL = "https://josephdamouni.github.io/app/";
   const KC = "deskgadget.token";
@@ -34,7 +35,7 @@ module.exports = async function run(core) {
     }
   }
   let creds = Keychain.contains(KC) ? JSON.parse(Keychain.get(KC)) : null;
-  if (!creds && !config.runsInWidget) creds = await askForToken("Paste the whole contents of token.json from your laptop.");
+  if (!creds && config.runsInApp) creds = await askForToken("Paste the whole contents of token.json from your laptop.");
 
   // ---------------------------------------------------------------- data
   async function http(url, opt) {
@@ -45,13 +46,16 @@ module.exports = async function run(core) {
     let json = null; try { json = await r.loadJSON(); } catch (e) {}
     return { status: (r.response && r.response.statusCode) || 0, json };
   }
+  const G = creds ? core.GoogleClient(creds, http, s => Data.fromBase64String(s.replace(/-/g, "+").replace(/_/g, "/")).toRawString()) : null;
+  let rawData = null; // the shared "Desk Gadget data" notes, needed to save settings
   async function loadData() {
     if (!creds) return { tasks: [], events: [], mail: [], data: null, error: "Open Scriptable and run Desk Gadget once to sign in." };
-    const g = core.GoogleClient(creds, http, s => Data.fromBase64String(s.replace(/-/g, "+").replace(/_/g, "/")).toRawString());
+    const full = config.runsInWidget;
     try {
-      const [tasks, events, mail, d] = await Promise.all([g.tasks(), g.events(), g.mail(readJSON(HIDDEN, {})), g.readData()]);
-      const out = { tasks, events, mail, data: { timetable: d.timetable, alerts: d.alerts }, updatedAt: Date.now(), error: null };
-      fm.writeString(CACHE, JSON.stringify(out));
+      const [tasks, events, mail, d] = await Promise.all([G.tasks(), full ? G.events() : [], full ? G.mail(readJSON(HIDDEN, {})) : [], G.readData()]);
+      rawData = d;
+      const out = { tasks, events, mail, data: { timetable: d.timetable, alerts: d.alerts, settings: d.settings }, updatedAt: Date.now(), error: null };
+      if (full) fm.writeString(CACHE, JSON.stringify(out));
       return out;
     } catch (e) {
       const cached = readJSON(CACHE, { tasks: [], events: [], mail: [], data: null });
@@ -59,7 +63,7 @@ module.exports = async function run(core) {
     }
   }
   const data = await loadData();
-  if (data.errorCode === "SIGNIN" && !config.runsInWidget) {
+  if (data.errorCode === "SIGNIN" && config.runsInApp) {
     Keychain.remove(KC);
     creds = await askForToken("Your Google sign-in expired. Paste a fresh token.json from your laptop.");
   }
@@ -68,23 +72,50 @@ module.exports = async function run(core) {
   const tt = data.data && data.data.timetable;
   const occ = tt ? core.attachAlerts(core.occurrences(tt, todayStr(), 14), (data.data && data.data.alerts) || []) : [];
 
+  // ---------------------------------------------------------------- notification settings + silencing
+  let settings = core.notifySettings((data.data && data.data.settings) || readJSON(fm.joinPath(DIR, "settings.json"), {}));
+  const params = (args && args.queryParameters) || {};
+  const self = "scriptable:///run/" + encodeURIComponent(Script.name());
+  async function setMute(mode) {
+    settings = core.applyMute(settings, mode, new Date());
+    fm.writeString(fm.joinPath(DIR, "settings.json"), JSON.stringify(settings));
+    if (G && rawData) { try { await G.saveSettings(rawData, settings); } catch (e) {} }
+  }
+  if (params.mute) await setMute(params.mute);
+  else fm.writeString(fm.joinPath(DIR, "settings.json"), JSON.stringify(settings));
+
   // ---------------------------------------------------------------- reminders (real iPhone notifications)
+  let scheduledCount = 0;
   async function scheduleReminders() {
-    if (data.error) return; // keep what's already scheduled until fresh data arrives
+    if (data.error && !params.mute) return; // keep what's already scheduled until fresh data arrives
     try {
       const pending = await Notification.allPending();
       const ours = pending.map(n => n.identifier).filter(id => String(id).startsWith("dg-"));
       if (ours.length) Notification.removePending(ours);
-      for (const r of core.upcomingReminders(new Date(), data.tasks, occ, 48)) {
+      if (data.error) return; // silenced while offline: everything pending is cleared
+      const L = core.reminderText(settings.lang);
+      for (const r of core.upcomingReminders(new Date(), data.tasks, occ, 48, settings)) {
         const n = new Notification();
         n.identifier = r.id; n.title = r.title; n.body = r.body; n.threadIdentifier = "desk-gadget";
-        n.openURL = APP_URL;
+        n.addAction(L.silenceToday, self + "?mute=day");
+        n.addAction(L.turnOff, self + "?mute=off", true);
         n.setTriggerDate(r.when);
         await n.schedule();
+        scheduledCount++;
       }
     } catch (e) { /* notifications are best-effort */ }
   }
   await scheduleReminders();
+  function statusLine() {
+    const m = core.muteState(settings, new Date());
+    const he = settings.lang === "he";
+    if (m.kind === "off") return he ? "ההתראות כבויות." : "Notifications are off.";
+    if (m.kind === "muted") {
+      const until = m.until.toLocaleString(he ? "he-IL" : "en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+      return he ? `ההתראות מושתקות עד ${until}.` : `Notifications are silenced until ${until}.`;
+    }
+    return he ? `${scheduledCount} תזכורות מתוזמנות ליומיים הקרובים.` : `${scheduledCount} reminder${scheduledCount === 1 ? "" : "s"} scheduled for the next two days.`;
+  }
 
   // ---------------------------------------------------------------- widget
   function addText(stack, text, size, color, weight = "regular", lines = 1) {
@@ -209,19 +240,28 @@ module.exports = async function run(core) {
 
   if (config.runsInWidget) {
     Script.setWidget(buildWidget(config.widgetFamily, args.widgetParameter));
-  } else {
-    // Run from the Scriptable app: confirm reminders are set and offer the useful actions.
-    const pending = (await Notification.allPending()).filter(n => String(n.identifier).startsWith("dg-")).length;
+  } else if (config.runsInApp && (params.mute || params.apply)) {
+    // From a notification button or the app's Silence buttons: just confirm
+    const b = new Alert(); b.title = "Desk Gadget"; b.message = statusLine(); b.addAction("OK"); await b.presentAlert();
+  } else if (config.runsInApp) {
+    // Opened in Scriptable
+    const m = core.muteState(settings, new Date());
     const a = new Alert();
     a.title = "Desk Gadget";
-    a.message = data.error ? data.error : `Connected. ${pending} reminder${pending === 1 ? "" : "s"} scheduled for the next two days.`;
-    a.addAction("Open Desk Gadget");
+    a.message = data.error ? data.error : statusLine();
+    const actions = [];
+    if (m.kind === "on") { actions.push(["Silence for today", "day"]); actions.push(["Silence for a week", "week"]); actions.push(["Turn notifications off", "off"]); }
+    else actions.push(["Turn notifications back on", "on"]);
+    actions.forEach(([label]) => a.addAction(label));
     a.addAction("Paste a new token.json");
-    a.addAction("Preview widget");
-    a.addCancelAction("Close");
+    a.addCancelAction("Done");
     const i = await a.presentSheet();
-    if (i === 0) Safari.open(APP_URL);
-    if (i === 1) { Keychain.remove(KC); await askForToken("Paste the whole contents of token.json from your laptop."); }
-    if (i === 2) await buildWidget("large", "").presentLarge();
+    if (i >= 0 && i < actions.length) {
+      await setMute(actions[i][1]); await scheduleReminders();
+      const b = new Alert(); b.title = "Desk Gadget"; b.message = statusLine(); b.addAction("OK"); await b.presentAlert();
+    } else if (i === actions.length) { Keychain.remove(KC); await askForToken("Paste the whole contents of token.json from your laptop."); }
+  } else {
+    // Run by a Shortcuts automation: no UI, just schedule.
+    Script.setShortcutOutput(data.error ? data.error : statusLine());
   }
 };

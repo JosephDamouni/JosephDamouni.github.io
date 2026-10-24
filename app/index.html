@@ -110,6 +110,18 @@ section{background:var(--panel);border:1px solid var(--line);border-radius:14px;
 .banner{margin:0 16px;padding:10px 12px;border-radius:12px;font-size:13.5px;background:var(--warn-bg);color:var(--warn);display:flex;gap:10px;align-items:center;justify-content:space-between}
 .banner.bad{background:var(--bad-bg);color:var(--bad)}
 .banner button{border:1px solid currentColor;background:transparent;border-radius:999px;padding:4px 12px;white-space:nowrap}
+.nrow{display:flex;flex-wrap:wrap;gap:8px;padding:0 14px 12px}
+.nrow button{border:1px solid var(--line);background:var(--soft);border-radius:999px;padding:8px 14px;font-weight:600;font-size:14px}
+.nrow button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-top:1px solid var(--line);font-size:15px}
+.sw input{appearance:none;-webkit-appearance:none;width:46px;height:28px;border-radius:999px;background:var(--mute-bg);position:relative;flex:none;transition:background .15s}
+.sw input::after{content:"";position:absolute;top:3px;inset-inline-start:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .15s}
+.sw input:checked{background:var(--accent)}
+.sw input:checked::after{transform:translateX(18px)}
+[dir="rtl"] .sw input:checked::after{transform:translateX(-18px)}
+.sw.off{opacity:.45}
+.nnote{padding:10px 14px 14px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px}
+.linkish{border:0;background:none;color:var(--accent);padding:0;font-size:12.5px;text-decoration:underline;text-underline-offset:2px}
 .foot{color:var(--muted);font-size:12px;text-align:center;padding:4px 0 0}
 .foot button{border:0;background:none;color:var(--muted);text-decoration:underline;text-underline-offset:2px;padding:0;font-size:12px}
 
@@ -178,6 +190,14 @@ section{background:var(--panel);border:1px solid var(--line);border-radius:14px;
     <section aria-labelledby="hMail">
       <div class="sh"><h2 id="hMail" data-i18n="mail">Important mail</h2><span class="meta" id="mailMeta"></span></div>
       <div id="mail"><div class="empty" data-i18n="loading">Loading…</div></div>
+    </section>
+    <section aria-labelledby="hNotif" id="notifSec">
+      <div class="sh"><h2 id="hNotif" data-i18n="notif">Notifications</h2><span class="meta" id="notifState"></span></div>
+      <div class="nrow" id="notifBtns"></div>
+      <label class="sw"><span data-i18n="kMorning">Morning summary · 08:00</span><input type="checkbox" id="kMorning"></label>
+      <label class="sw"><span data-i18n="kEvening">For tomorrow · 20:00</span><input type="checkbox" id="kEvening"></label>
+      <label class="sw"><span data-i18n="kClasses">15 min before class</span><input type="checkbox" id="kClasses"></label>
+      <div class="nnote"><span data-i18n="nNote">Silence buttons apply right away. Other changes apply at the next scheduled update.</span> <button type="button" class="linkish" id="applyNow" data-i18n="applyNow">Apply now</button></div>
     </section>
     <div class="foot"><span id="updated"></span> · <button type="button" id="bSignOut" data-i18n="disconnect">Disconnect</button></div>
   </main>
