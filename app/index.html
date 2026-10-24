@@ -82,7 +82,7 @@ section{background:var(--panel);border:1px solid var(--line);border-radius:14px;
 .add input[type=text]{grid-column:1/-1;width:100%;border:1px solid var(--line);background:var(--soft);border-radius:10px;padding:11px 12px;font-size:16px}
 .datewrap{position:relative;display:block;min-width:0}
 .add input[type=date]{width:100%;min-height:46px;border:1px solid var(--line);background:var(--soft);border-radius:10px;padding:9px 12px;min-width:0;font-size:15px;color:var(--ink)}
-.datewrap .ph{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;font-size:15px}
+.datewrap .ph{position:absolute;inset-inline-start:13px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;font-size:15px}
 .datewrap.has .ph{display:none}
 .datewrap:not(.has) input[type=date]{color:transparent}
 .add button{border:0;background:var(--accent);color:var(--accent-ink);border-radius:10px;padding:0 20px;font-weight:700}
@@ -99,6 +99,10 @@ section{background:var(--panel);border:1px solid var(--line);border-radius:14px;
 .weeknav .lbl{font-weight:700}
 .weeknav button{border:1px solid var(--line);background:transparent;border-radius:8px;width:36px;height:32px;font-size:18px}
 .weeknav button:disabled{opacity:.35}
+[dir="rtl"] .weeknav button{transform:scaleX(-1)}
+.langbtn{font-weight:700;font-size:14px;color:var(--ink)}
+.setuphead{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.when{unicode-bidi:isolate}
 
 .banner{margin:0 16px;padding:10px 12px;border-radius:12px;font-size:13.5px;background:var(--warn-bg);color:var(--warn);display:flex;gap:10px;align-items:center;justify-content:space-between}
 .banner.bad{background:var(--bad-bg);color:var(--bad)}
@@ -120,58 +124,59 @@ section{background:var(--panel);border:1px solid var(--line);border-radius:14px;
 <body>
 
 <div id="setup" class="setup" hidden>
-  <h1>Desk Gadget</h1>
-  <p>Connect your Google account once. Paste the sign-in file from your laptop's Desk Gadget:</p>
+  <div class="setuphead"><h1>Desk Gadget</h1><button class="ic langbtn" type="button">עב</button></div>
+  <p data-i18n="setupIntro">Connect your Google account once. Paste the sign-in file from your laptop's Desk Gadget:</p>
   <ol>
-    <li>On the laptop, press Windows + R, type <code>%APPDATA%\DeskGadget</code> and open <code>token.json</code> in Notepad.</li>
-    <li>Copy everything in it and get it to this phone (for example, email it to yourself, then delete that email).</li>
-    <li>Paste it below and tap Connect.</li>
+    <li data-i18n-html="step1">On the laptop, press Windows + R, type <code>%APPDATA%\DeskGadget</code> and open <code>token.json</code> in Notepad.</li>
+    <li data-i18n="step2">Copy everything in it and get it to this phone (for example, email it to yourself, then delete that email).</li>
+    <li data-i18n="step3">Paste it below and tap Connect.</li>
   </ol>
   <label for="tokenBox" class="sr">token.json</label>
   <textarea id="tokenBox" placeholder='{"token": "...", "refresh_token": "...", "client_id": "...", "client_secret": "..."}' autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
   <div class="err" id="setupErr" hidden></div>
-  <button class="go" id="connectBtn" type="button">Connect</button>
-  <p style="font-size:13px">It stays on this phone only. Nothing is sent anywhere except to Google.</p>
+  <button class="go" id="connectBtn" type="button" data-i18n="connect">Connect</button>
+  <p style="font-size:13px" data-i18n="privacy">It stays on this phone only. Nothing is sent anywhere except to Google.</p>
 </div>
 
 <div id="appView" hidden>
   <header class="top">
     <div class="clock">
       <span class="time" id="time">--:--</span><span class="date" id="date"></span>
+      <button class="ic langbtn" type="button">עב</button>
       <button class="ic" id="bRefresh" type="button" aria-label="Refresh"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
     </div>
     <nav class="tabs" role="tablist" aria-label="Views">
-      <button class="tab" role="tab" id="tabToday" aria-selected="true" type="button">Today</button>
-      <button class="tab" role="tab" id="tabWeek" aria-selected="false" type="button">Week</button>
+      <button class="tab" role="tab" id="tabToday" aria-selected="true" type="button" data-i18n="today">Today</button>
+      <button class="tab" role="tab" id="tabWeek" aria-selected="false" type="button" data-i18n="week">Week</button>
     </nav>
   </header>
-  <div class="pull" id="pull">Release to refresh</div>
+  <div class="pull" id="pull" data-i18n="pull">Release to refresh</div>
   <div class="banner" id="banner" hidden><span id="bannerText"></span><button id="bannerBtn" type="button" hidden></button></div>
 
   <main id="viewToday">
     <section id="nextSec" hidden aria-labelledby="hNext">
-      <div class="sh"><h2 id="hNext">Next class</h2><span class="meta" id="nextMeta"></span></div>
+      <div class="sh"><h2 id="hNext" data-i18n="nextClass">Next class</h2><span class="meta" id="nextMeta"></span></div>
       <div id="next"></div>
     </section>
     <section aria-labelledby="hTasks">
-      <div class="sh"><h2 id="hTasks">Tasks</h2><span class="meta" id="taskMeta"></span></div>
+      <div class="sh"><h2 id="hTasks" data-i18n="tasks">Tasks</h2><span class="meta" id="taskMeta"></span></div>
       <form class="add" id="addForm" autocomplete="off">
-        <input type="text" id="taskTitle" placeholder="Add a task" maxlength="300" aria-label="New task" enterkeyhint="done">
-        <label class="datewrap" id="dateWrap"><span class="ph">Due date (optional)</span><input type="date" id="taskDue" aria-label="Due date (optional)"></label>
-        <button type="submit" id="addBtn">Add</button>
+        <input type="text" id="taskTitle" placeholder="Add a task" data-i18n-ph="addPh" maxlength="300" aria-label="New task" enterkeyhint="done">
+        <label class="datewrap" id="dateWrap"><span class="ph" data-i18n="dueDate">Due date (optional)</span><input type="date" id="taskDue" aria-label="Due date (optional)"></label>
+        <button type="submit" id="addBtn" data-i18n="add">Add</button>
         <div class="err" id="addErr" hidden></div>
       </form>
-      <div id="tasks"><div class="empty">Loading…</div></div>
+      <div id="tasks"><div class="empty" data-i18n="loading">Loading…</div></div>
     </section>
     <section aria-labelledby="hCal">
-      <div class="sh"><h2 id="hCal">Calendar</h2><span class="meta">next 30 days</span></div>
-      <div id="cal"><div class="empty">Loading…</div></div>
+      <div class="sh"><h2 id="hCal" data-i18n="calendar">Calendar</h2><span class="meta" data-i18n="next30">next 30 days</span></div>
+      <div id="cal"><div class="empty" data-i18n="loading">Loading…</div></div>
     </section>
     <section aria-labelledby="hMail">
-      <div class="sh"><h2 id="hMail">Important mail</h2><span class="meta" id="mailMeta"></span></div>
-      <div id="mail"><div class="empty">Loading…</div></div>
+      <div class="sh"><h2 id="hMail" data-i18n="mail">Important mail</h2><span class="meta" id="mailMeta"></span></div>
+      <div id="mail"><div class="empty" data-i18n="loading">Loading…</div></div>
     </section>
-    <div class="foot"><span id="updated"></span> · <button type="button" id="bSignOut">Disconnect</button></div>
+    <div class="foot"><span id="updated"></span> · <button type="button" id="bSignOut" data-i18n="disconnect">Disconnect</button></div>
   </main>
 
   <main id="viewWeek" hidden>
